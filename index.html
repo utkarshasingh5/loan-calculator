@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Loan EMI Calculator</title>
+<meta name="description" content="Calculate your monthly EMI, total interest and total payment for any loan.">
+<style>
+  :root {
+    --bg: #f4f6fb; --card: #ffffff; --text: #1c2333; --muted: #6b7489;
+    --primary: #3b5bdb; --primary-dark: #2f49b3; --accent: #12b886; --border: #dde2ee;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #11151f; --card: #1a2030; --text: #e8ebf3; --muted: #98a1b8; --border: #2b3348; --primary: #5c7cfa; --primary-dark: #4c6ef5; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; }
+  header { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: #fff; text-align: center; padding: 56px 16px 96px; }
+  header h1 { margin: 0 0 8px; font-size: clamp(1.8rem, 5vw, 2.6rem); }
+  header p { margin: 0; opacity: .9; }
+  main { max-width: 960px; margin: -64px auto 40px; padding: 0 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 760px) { main { grid-template-columns: 1fr; } }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 24px; box-shadow: 0 6px 24px rgba(0,0,0,.08); }
+  h2 { margin: 0 0 18px; font-size: 1.15rem; }
+  .field { margin-bottom: 22px; }
+  .field label { display: flex; justify-content: space-between; align-items: center; font-weight: 600; font-size: .92rem; margin-bottom: 8px; }
+  .field input[type=number] { width: 130px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font-size: .95rem; text-align: right; }
+  input[type=range] { width: 100%; accent-color: var(--primary); }
+  .range-lbl { display: flex; justify-content: space-between; color: var(--muted); font-size: .78rem; }
+  .toggle { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-left: 8px; }
+  .toggle button { border: 0; background: var(--bg); color: var(--muted); padding: 5px 12px; cursor: pointer; font-size: .85rem; }
+  .toggle button.on { background: var(--primary); color: #fff; }
+  .emi { text-align: center; padding: 18px; border-radius: 12px; background: var(--bg); margin-bottom: 18px; }
+  .emi small { color: var(--muted); display: block; }
+  .emi strong { font-size: 2.2rem; color: var(--primary); }
+  .row { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .row:last-of-type { border-bottom: 0; }
+  .row span:first-child { color: var(--muted); }
+  .bar { display: flex; height: 14px; border-radius: 7px; overflow: hidden; margin: 18px 0 8px; background: var(--border); }
+  .bar i { display: block; transition: width .3s; }
+  .legend { display: flex; justify-content: space-between; font-size: .8rem; color: var(--muted); }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; }
+  .schedule { grid-column: 1 / -1; }
+  .scroll { max-height: 320px; overflow: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+  th, td { padding: 8px 10px; text-align: right; border-bottom: 1px solid var(--border); }
+  th:first-child, td:first-child { text-align: left; }
+  th { position: sticky; top: 0; background: var(--card); color: var(--muted); }
+  footer { text-align: center; color: var(--muted); font-size: .8rem; padding: 0 16px 32px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Loan EMI Calculator</h1>
+  <p>Plan your loan: see your monthly EMI, total interest and total payment instantly.</p>
+</header>
+
+<main>
+  <section class="card" aria-label="Loan inputs">
+    <h2>Loan details</h2>
+
+    <div class="field">
+      <label for="amount">Loan amount <input type="number" id="amountN" min="1000" max="100000000" step="1000"></label>
+      <input type="range" id="amount" min="10000" max="10000000" step="10000">
+      <div class="range-lbl"><span>10K</span><span>10M</span></div>
+    </div>
+
+    <div class="field">
+      <label for="rate">Interest rate (% per year) <input type="number" id="rateN" min="0.1" max="30" step="0.05"></label>
+      <input type="range" id="rate" min="1" max="30" step="0.05">
+      <div class="range-lbl"><span>1%</span><span>30%</span></div>
+    </div>
+
+    <div class="field">
+      <label for="tenure">
+        <span>Tenure
+          <span class="toggle" role="group" aria-label="Tenure unit">
+            <button type="button" id="uY" class="on">Years</button><button type="button" id="uM">Months</button>
+          </span>
+        </span>
+        <input type="number" id="tenureN" min="1" step="1">
+      </label>
+      <input type="range" id="tenure" min="1" step="1">
+      <div class="range-lbl"><span id="tMin"></span><span id="tMax"></span></div>
+    </div>
+  </section>
+
+  <section class="card" aria-label="Results" aria-live="polite">
+    <h2>Your repayment</h2>
+    <div class="emi"><small>Monthly EMI</small><strong id="emi">–</strong></div>
+    <div class="row"><span>Principal amount</span><b id="principal">–</b></div>
+    <div class="row"><span>Total interest</span><b id="interest">–</b></div>
+    <div class="row"><span>Total payment</span><b id="total">–</b></div>
+    <div class="bar"><i id="bP" style="background:var(--primary)"></i><i id="bI" style="background:var(--accent)"></i></div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--primary)"></span>Principal <span id="pP"></span></span>
+      <span><span class="dot" style="background:var(--accent)"></span>Interest <span id="pI"></span></span>
+    </div>
+  </section>
+
+  <section class="card schedule" aria-label="Amortization schedule">
+    <h2>Yearly amortization schedule</h2>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Year</th><th>Principal paid</th><th>Interest paid</th><th>Balance</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<footer>EMI = P × r × (1+r)<sup>n</sup> / ((1+r)<sup>n</sup> − 1). Figures are estimates; actual lender terms may vary.</footer>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var unit = 'Y';
+  var fmt = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 });
+  var money = function (v) { return fmt.format(Math.round(v)); };
+
+  function clamp(el, v) {
+    v = parseFloat(v);
+    if (isNaN(v)) v = parseFloat(el.min);
+    return Math.min(Math.max(v, parseFloat(el.min)), parseFloat(el.max || Infinity));
+  }
+
+  function bind(range, num) {
+    $(range).addEventListener('input', function () { $(num).value = this.value; calc(); });
+    $(num).addEventListener('input', function () {
+      var r = $(range);
+      var v = parseFloat(this.value);
+      if (!isNaN(v)) { r.value = v; calc(); }
+    });
+    $(num).addEventListener('blur', function () {
+      var r = $(range);
+      this.value = clamp(this, this.value);
+      r.value = this.value;
+      calc();
+    });
+  }
+
+  function setUnit(u) {
+    unit = u;
+    var t = $('tenure'), n = $('tenureN');
+    var months = parseFloat(t.value || 0) * (u === 'Y' ? 1 : 1); // placeholder, recomputed below
+    var cur = parseFloat(n.value) || 20;
+    var newVal;
+    if (u === 'M') { newVal = Math.round(cur * 12); t.min = n.min = 1; t.max = n.max = 360; t.step = 1; }
+    else { newVal = Math.max(1, Math.round(cur / 12)); t.min = n.min = 1; t.max = n.max = 30; t.step = 1; }
+    t.value = n.value = Math.min(newVal, t.max);
+    $('uY').classList.toggle('on', u === 'Y');
+    $('uM').classList.toggle('on', u === 'M');
+    $('tMin').textContent = '1 ' + (u === 'Y' ? 'yr' : 'mo');
+    $('tMax').textContent = t.max + ' ' + (u === 'Y' ? 'yrs' : 'mos');
+    calc();
+  }
+
+  function calc() {
+    var P = parseFloat($('amountN').value) || 0;
+    var annual = parseFloat($('rateN').value) || 0;
+    var t = parseFloat($('tenureN').value) || 0;
+    var n = Math.round(unit === 'Y' ? t * 12 : t);
+    if (P <= 0 || n <= 0) return;
+    var r = annual / 12 / 100;
+    var emi = r === 0 ? P / n : P * r * Math.pow(1 + r, n) / (Math.pow(1 + r, n) - 1);
+    var total = emi * n, interest = total - P;
+
+    $('emi').textContent = money(emi);
+    $('principal').textContent = money(P);
+    $('interest').textContent = money(interest);
+    $('total').textContent = money(total);
+    var pp = P / total * 100;
+    $('bP').style.width = pp + '%';
+    $('bI').style.width = (100 - pp) + '%';
+    $('pP').textContent = pp.toFixed(0) + '%';
+    $('pI').textContent = (100 - pp).toFixed(0) + '%';
+
+    var bal = P, html = '', year = 1, yp = 0, yi = 0;
+    for (var m = 1; m <= n; m++) {
+      var i = bal * r, p = emi - i;
+      bal = Math.max(bal - p, 0); yp += p; yi += i;
+      if (m % 12 === 0 || m === n) {
+        html += '<tr><td>' + year + '</td><td>' + money(yp) + '</td><td>' + money(yi) + '</td><td>' + money(bal < 0.5 ? 0 : bal) + '</td></tr>';
+        year++; yp = yi = 0;
+      }
+    }
+    $('rows').innerHTML = html;
+  }
+
+  $('amount').value = $('amountN').value = 1000000;
+  $('rate').value = $('rateN').value = 8.5;
+  $('tenure').value = $('tenureN').value = 20;
+  bind('amount', 'amountN'); bind('rate', 'rateN'); bind('tenure', 'tenureN');
+  $('uY').addEventListener('click', function () { if (unit !== 'Y') setUnit('Y'); });
+  $('uM').addEventListener('click', function () { if (unit !== 'M') setUnit('M'); });
+  setUnit('Y');
+})();
+</script>
+</body>
+</html>
